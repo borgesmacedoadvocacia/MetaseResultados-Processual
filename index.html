@@ -344,6 +344,39 @@ function loadKPI() {
     .then(function(t){ if (!t) return false; var p = parseKPI(t); if (!p) return false; KPI_DATA = p; return true; });
 }
 
+// Para meses não cobertos pela aba KPI 2026, lê de "Resultados Gerais - mes/ano"
+function loadGeraisIntoKPI(mes) {
+  if (!KPI_DATA) return Promise.resolve();
+  var base = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:json&headers=1&sheet=';
+  return gvizFetch(base + encodeURIComponent('Resultados Gerais - '+mes+'/'+ANO_SUF))
+    .then(function(table) {
+      if (!table || !table.rows) return;
+      var byMatch = {};
+      KPI_DEFS.forEach(function(d){ if (!byMatch[d.match]) byMatch[d.match]=[]; byMatch[d.match].push(d); });
+      var curSub = null;
+      table.rows.forEach(function(row) {
+        var subNom = cv(row,1), atvNom = cv(row,2);
+        if (subNom) {
+          var sn = norm(String(subNom).trim());
+          if (Object.prototype.hasOwnProperty.call(SUB_MAP, sn)) curSub = SUB_MAP[sn];
+        }
+        if (!atvNom) return;
+        var n = norm(String(atvNom).trim());
+        var cands = byMatch[n];
+        if (!cands) { for (var k in byMatch) { if (n.indexOf(k)===0) { cands=byMatch[k]; break; } } }
+        if (!cands || !cands.length) return;
+        var def = cands.length===1 ? cands[0] : (cands.filter(function(d){ return d.sub===curSub; })[0]||cands[0]);
+        var slot = KPI_DATA.byId[def.id];
+        if (!slot) return;
+        // Só preenche se o mês ainda não tem dado da aba KPI 2026
+        if (!slot.months[mes] || slot.months[mes].v == null) {
+          slot.months[mes] = {v: cv(row,12), pct: xPct(row,13)};
+          if (slot.meta == null) slot.meta = cv(row,4);
+        }
+      });
+    }).catch(function(){});
+}
+
 // ══════════════════════════════════════════════════════════════════
 //  FORMAT
 // ══════════════════════════════════════════════════════════════════
@@ -687,6 +720,12 @@ function kpiView(view, btn){
 // ══════════════════════════════════════════════════════════════════
 function pollAll(){
   return loadKPI().then(function(){
+    // Meses de Jan até o atual; carrega Resultados Gerais para os que não estão na aba KPI 2026
+    var toLoad = MESES.slice(0, MES_IDX + 1);
+    var cobertos = KPI_DATA ? KPI_DATA.mCols.map(function(mc){ return mc.abbr; }) : [];
+    var faltando = toLoad.filter(function(m){ return cobertos.indexOf(m) < 0; });
+    return Promise.all(faltando.map(function(m){ return loadGeraisIntoKPI(m); }));
+  }).then(function(){
     buildMbarKPI();
     if (kpi_view==='mensal') renderKPIMensal();
     else renderKPIAnual();
