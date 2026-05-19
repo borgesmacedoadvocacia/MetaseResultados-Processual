@@ -369,15 +369,30 @@ const MONTH_ABBRS = {
   'setembro':'Set','outubro':'Out','novembro':'Nov','dezembro':'Dez'
 };
 
-const SECTION_TITLES = new Set([
-  'publicacoes, prazos, audiencias e diligencias',
-  'mapeamentos e feedbacks aos clientes',
-  'novos clientes e processos',
-  'resultados de processos - liminares',
-  'sentencas','recursos','alvaras e acordos'
-]);
+// Section markers → section id (null = passthrough/ignorar)
+const SECTION_MAP = {
+  'publicacoes, prazos, audiencias e diligencias': 'operacional',
+  'mapeamentos e feedbacks aos clientes':           'relacionamento',
+  'novos clientes e processos':                     'captacao',
+  'resultados de processos':                        null,
+  'liminares':                                      'liminares',
+  'sentencas':                                      'sentencas',
+  'recursos':                                       'recursos',
+  'alvaras e acordos':                              'financeiro',
+};
 
-const SUBSECTIONS = new Set(['geral','saude','bancario']);
+// Sub-seção markers → area id
+const SUBSECTION_MAP = {
+  'resultado de liminares: geral':    'geral',
+  'resultado de liminares: saude':    'saude',
+  'resultado de liminares: bancario': 'bancario',
+  'resultado de sentencas: geral':    'geral',
+  'resultado de sentencas: saude':    'saude',
+  'resultado de sentencas: bancario': 'bancario',
+  'resultado de recursos: geral':     'geral',
+  'resultado de recursos: saude':     'saude',
+  'resultado de recursos: bancario':  'bancario',
+};
 
 function parseTable(table) {
   if (!table || !table.rows || !table.rows.length) return null;
@@ -423,12 +438,25 @@ function parseTable(table) {
     if (!nameVal) continue;
     var n = normStr(nameVal);
 
-    // Section header?
-    if (SECTION_TITLES.has(n)) { currentSubSection = null; continue; }
-    // Sub-section header?
-    if (SUBSECTIONS.has(n)) { currentSubSection = n; continue; }
+    // Section marker?
+    if (Object.prototype.hasOwnProperty.call(SECTION_MAP, n)) {
+      var sid = SECTION_MAP[n];
+      if (sid !== null) currentSubSection = null;
+      continue;
+    }
+    // Sub-section marker?
+    if (Object.prototype.hasOwnProperty.call(SUBSECTION_MAP, n)) {
+      currentSubSection = SUBSECTION_MAP[n];
+      continue;
+    }
 
+    // Exact match first, then prefix (handles suffixes like "(Objetivo Alcançado)")
     var candidates = KPI_BY_MATCH[n];
+    if (!candidates) {
+      for (var key in KPI_BY_MATCH) {
+        if (n.indexOf(key) === 0) { candidates = KPI_BY_MATCH[key]; break; }
+      }
+    }
     if (!candidates || !candidates.length) continue;
 
     var def;
