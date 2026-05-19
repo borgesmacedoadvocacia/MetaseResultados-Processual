@@ -336,12 +336,13 @@ function tryFetchSheet(names) {
 function parseGeraisSheet(table, mesAbr) {
   if (!table || !table.rows) return false;
   var cols = table.cols || [];
-  var resultIdx = 3, pctIdx = 4, metaIdx = 1;
+  var resultIdx = 3, pctIdx = 4, metaIdx = 1, metaPropIdx = 2;
   cols.forEach(function(col, i) {
     var lbl = norm((col && col.label) || '');
     if (lbl === 'resultado mensal') resultIdx = i;
     else if (lbl === 'resultado x meta') pctIdx = i;
     else if (lbl === 'meta mensal') metaIdx = i;
+    else if (lbl === 'meta proporcional') metaPropIdx = i;
   });
   var byMatch = {};
   KPI_DEFS.forEach(function(d){ if (!byMatch[d.match]) byMatch[d.match]=[]; byMatch[d.match].push(d); });
@@ -357,8 +358,8 @@ function parseGeraisSheet(table, mesAbr) {
     var def = cands.length === 1 ? cands[0] : (cands.filter(function(d){ return d.sub === curSub; })[0] || cands[0]);
     var slot = KPI_DATA.byId[def.id];
     if (!slot) return;
-    var v = cv(row, resultIdx), pct = xPct(row, pctIdx), meta = cv(row, metaIdx);
-    slot.months[mesAbr] = {v: v, pct: pct};
+    var v = cv(row, resultIdx), pct = xPct(row, pctIdx), meta = cv(row, metaIdx), metaProp = cv(row, metaPropIdx);
+    slot.months[mesAbr] = {v: v, pct: pct, metaProp: metaProp};
     if (slot.meta == null && meta != null) slot.meta = meta;
     if (v != null) hadData = true;
   });
@@ -412,9 +413,9 @@ function stColor(pct,dir){ return co(pct,dir).c.split('-')[1]; }
 function kpiSlot(id){
   if (!KPI_DATA) return null;
   var slot = KPI_DATA.byId[id]; if (!slot) return null;
-  if (kpi_sel === 'Méd' && KPI_DATA.medCol) return {v:slot.med.v, pct:slot.med.pct, meta:slot.meta};
+  if (kpi_sel === 'Méd' && KPI_DATA.medCol) return {v:slot.med.v, pct:slot.med.pct, meta:slot.meta, metaProp:null};
   var m = slot.months[kpi_sel];
-  return {v: m?m.v:null, pct: m?m.pct:null, meta:slot.meta};
+  return {v: m?m.v:null, pct: m?m.pct:null, meta:slot.meta, metaProp: m?m.metaProp:null};
 }
 
 function kCard(id){
@@ -425,9 +426,12 @@ function kCard(id){
   return '<div class="kcard">'+
     '<div class="kc-head"><div class="kdot '+ci.d+'"></div><div class="kname">'+esc(def.nome)+'</div></div>'+
     '<div class="kresult">'+fV(s.v,def.fmt)+'</div>'+
-    (s.meta!=null ? '<div class="kdetails"><div class="krow"><span class="lbl">Meta mensal</span><span class="val">'+fV(s.meta,def.fmt)+'</span></div></div>' : '')+
+    '<div class="kdetails">'+
+      (s.meta!=null ? '<div class="krow"><span class="lbl">Meta mensal</span><span class="val">'+fV(s.meta,def.fmt)+'</span></div>' : '')+
+      (s.metaProp!=null ? '<div class="krow"><span class="lbl">Meta prop.</span><span class="val">'+fV(s.metaProp,def.fmt)+'</span></div>' : '')+
+    '</div>'+
     (def.dir!=='info' ?
-      '<div class="kpct-row"><span class="plbl">% da meta</span><span class="kpct-main '+ci.c+'">'+fP(s.pct)+'</span></div>'+
+      '<div class="kpct-row"><span class="plbl">% meta prop.</span><span class="kpct-main '+ci.c+'">'+fP(s.pct)+'</span></div>'+
       '<div class="pbar-bg"><div class="pbar-fill '+ci.b+'" style="width:'+bw+'"></div></div>'
     : '')+
   '</div>';
