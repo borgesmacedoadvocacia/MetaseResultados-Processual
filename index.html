@@ -304,77 +304,84 @@ var SUB_MAP = {
   'resultado de sentencas: geral':'geral','resultado de sentencas: saude':'saude','resultado de sentencas: bancario':'bancario',
   'resultado de recursos: geral':'geral','resultado de recursos: saude':'saude','resultado de recursos: bancario':'bancario'
 };
-var MON_MAP = {janeiro:'Jan',fevereiro:'Fev',marco:'Mar',abril:'Abr',maio:'Mai',junho:'Jun',julho:'Jul',agosto:'Ago',setembro:'Set',outubro:'Out',novembro:'Nov',dezembro:'Dez'};
+// Nomes completos dos meses para montar o nome das abas
+var MESES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-// ── PARSE KPI 2026 ─────────────────────────────────────────────────
-function parseKPI(table) {
-  if (!table || !table.rows) return null;
-  var cols = table.cols || [], rows = table.rows;
-  var mCols = [], medCol = null, metaIdx = 1;
-  for (var i = 0; i < cols.length; i++) {
-    var lbl = norm((cols[i] && cols[i].label) || '');
-    if (MON_MAP[lbl]) mCols.push({abbr:MON_MAP[lbl], vi:i, pi:i+1});
-    else if (lbl === 'medias' || lbl === 'media') medCol = {abbr:'Méd', vi:i, pi:i+1};
-    else if (lbl.indexOf('meta') >= 0) metaIdx = i;
+// Candidatos de nome de aba para cada mês (tenta na ordem até achar)
+function getSheetCandidates(mesIdx) {
+  var ano = '20'+ANO_SUF;
+  var mesFull = MESES_FULL[mesIdx];
+  return [
+    'Resultados Gerais - '+mesFull+'/'+ano,
+    'Processual - '+mesFull+'/'+ano,
+    'Resultados Gerais - '+mesFull+' '+ano,
+    'Processual - '+mesFull+' '+ano
+  ];
+}
+
+// Tenta cada nome de aba em sequência até obter dados
+function tryFetchSheet(names) {
+  var base = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:json&headers=1&sheet=';
+  var idx = 0;
+  function tryNext() {
+    if (idx >= names.length) return Promise.resolve(null);
+    return gvizFetch(base + encodeURIComponent(names[idx++])).then(function(t){ return t || tryNext(); });
   }
+  return tryNext();
+}
+
+// Estrutura das abas mensais (Resultados Gerais - MêsCompleto/Ano):
+//   col 0: MÉTRICA  col 1: META MENSAL  col 2: META PROPORCIONAL
+//   col 3: RESULTADO MENSAL  col 4: RESULTADO X META  col 5: MÉDIA DIÁRIA
+function parseGeraisSheet(table, mesAbr) {
+  if (!table || !table.rows) return false;
+  var cols = table.cols || [];
+  var resultIdx = 3, pctIdx = 4, metaIdx = 1;
+  cols.forEach(function(col, i) {
+    var lbl = norm((col && col.label) || '');
+    if (lbl === 'resultado mensal') resultIdx = i;
+    else if (lbl === 'resultado x meta') pctIdx = i;
+    else if (lbl === 'meta mensal') metaIdx = i;
+  });
   var byMatch = {};
   KPI_DEFS.forEach(function(d){ if (!byMatch[d.match]) byMatch[d.match]=[]; byMatch[d.match].push(d); });
-  var byId = {};
-  KPI_DEFS.forEach(function(d){ byId[d.id] = {meta:null, months:{}, med:{v:null,pct:null}}; });
-  var curSub = null;
-  rows.forEach(function(row){
+  var curSub = null, hadData = false;
+  table.rows.forEach(function(row) {
     var nm = cv(row, 0); if (!nm) return;
-    var n = norm(nm);
+    var n = norm(String(nm).trim());
     if (Object.prototype.hasOwnProperty.call(SEC_MAP, n)) { curSub = null; return; }
     if (Object.prototype.hasOwnProperty.call(SUB_MAP, n)) { curSub = SUB_MAP[n]; return; }
     var cands = byMatch[n];
     if (!cands) { for (var k in byMatch) { if (n.indexOf(k) === 0) { cands = byMatch[k]; break; } } }
     if (!cands || !cands.length) return;
     var def = cands.length === 1 ? cands[0] : (cands.filter(function(d){ return d.sub === curSub; })[0] || cands[0]);
-    var slot = byId[def.id];
-    var mv = cv(row, metaIdx); slot.meta = (mv != null) ? mv : null;
-    mCols.forEach(function(mc){ slot.months[mc.abbr] = {v:cv(row,mc.vi), pct:xPct(row,mc.pi)}; });
-    if (medCol) slot.med = {v:cv(row,medCol.vi), pct:xPct(row,medCol.pi)};
+    var slot = KPI_DATA.byId[def.id];
+    if (!slot) return;
+    var v = cv(row, resultIdx), pct = xPct(row, pctIdx), meta = cv(row, metaIdx);
+    slot.months[mesAbr] = {v: v, pct: pct};
+    if (slot.meta == null && meta != null) slot.meta = meta;
+    if (v != null) hadData = true;
   });
-  return {mCols:mCols, medCol:medCol, byId:byId};
+  return hadData;
 }
 
-function loadKPI() {
-  return gvizFetch('https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:json&headers=1&gid='+GID_2026)
-    .then(function(t){ if (!t) return false; var p = parseKPI(t); if (!p) return false; KPI_DATA = p; return true; });
-}
-
-// Para meses não cobertos pela aba KPI 2026, lê de "Resultados Gerais - mes/ano"
-function loadGeraisIntoKPI(mes) {
-  if (!KPI_DATA) return Promise.resolve();
-  var base = 'https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/gviz/tq?tqx=out:json&headers=1&sheet=';
-  return gvizFetch(base + encodeURIComponent('Resultados Gerais - '+mes+'/'+ANO_SUF))
-    .then(function(table) {
-      if (!table || !table.rows) return;
-      var byMatch = {};
-      KPI_DEFS.forEach(function(d){ if (!byMatch[d.match]) byMatch[d.match]=[]; byMatch[d.match].push(d); });
-      var curSub = null;
-      table.rows.forEach(function(row) {
-        var subNom = cv(row,1), atvNom = cv(row,2);
-        if (subNom) {
-          var sn = norm(String(subNom).trim());
-          if (Object.prototype.hasOwnProperty.call(SUB_MAP, sn)) curSub = SUB_MAP[sn];
-        }
-        if (!atvNom) return;
-        var n = norm(String(atvNom).trim());
-        var cands = byMatch[n];
-        if (!cands) { for (var k in byMatch) { if (n.indexOf(k)===0) { cands=byMatch[k]; break; } } }
-        if (!cands || !cands.length) return;
-        var def = cands.length===1 ? cands[0] : (cands.filter(function(d){ return d.sub===curSub; })[0]||cands[0]);
-        var slot = KPI_DATA.byId[def.id];
-        if (!slot) return;
-        // Só preenche se o mês ainda não tem dado da aba KPI 2026
-        if (!slot.months[mes] || slot.months[mes].v == null) {
-          slot.months[mes] = {v: cv(row,12), pct: xPct(row,13)};
-          if (slot.meta == null) slot.meta = cv(row,4);
-        }
-      });
-    }).catch(function(){});
+// Carrega TODOS os meses (Jan → atual) a partir das abas mensais
+function loadAllMonthly() {
+  KPI_DATA = { mCols: [], medCol: null, byId: {} };
+  KPI_DEFS.forEach(function(d){ KPI_DATA.byId[d.id] = {meta: null, months: {}, med: {v:null, pct:null}}; });
+  var toLoad = MESES.slice(0, MES_IDX + 1); // ['Jan','Fev',...,'Mai']
+  return Promise.all(toLoad.map(function(mesAbr, idx) {
+    return tryFetchSheet(getSheetCandidates(idx)).then(function(table) {
+      if (!table) return;
+      var hadData = parseGeraisSheet(table, mesAbr);
+      if (hadData) KPI_DATA.mCols.push({abbr: mesAbr});
+    });
+  })).then(function() {
+    // Garante ordem Jan→Dez
+    var order = {}; MESES.forEach(function(m, i){ order[m] = i; });
+    KPI_DATA.mCols.sort(function(a, b){ return order[a.abbr] - order[b.abbr]; });
+    return KPI_DATA.mCols.length > 0;
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -719,13 +726,7 @@ function kpiView(view, btn){
 //  POLLING
 // ══════════════════════════════════════════════════════════════════
 function pollAll(){
-  return loadKPI().then(function(){
-    // Meses de Jan até o atual; carrega Resultados Gerais para os que não estão na aba KPI 2026
-    var toLoad = MESES.slice(0, MES_IDX + 1);
-    var cobertos = KPI_DATA ? KPI_DATA.mCols.map(function(mc){ return mc.abbr; }) : [];
-    var faltando = toLoad.filter(function(m){ return cobertos.indexOf(m) < 0; });
-    return Promise.all(faltando.map(function(m){ return loadGeraisIntoKPI(m); }));
-  }).then(function(){
+  return loadAllMonthly().then(function(){
     buildMbarKPI();
     if (kpi_view==='mensal') renderKPIMensal();
     else renderKPIAnual();
