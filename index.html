@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KPIs Processual · BM Advocacia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f5f5f3;
+  --card: #ffffff;
+  --border: #e5e5e3;
+  --text: #1c1c1c;
+  --muted: #737373;
+  --green: #16a34a;
+  --yellow: #ca8a04;
+  --red: #dc2626;
+  --accent: #0f766e;
+  --accent-lt: #f0fdfa;
+  --radius: 10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.45}
+
+/* ── HEADER ── */
+.hdr{background:var(--card);border-bottom:1px solid var(--border);padding:13px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
+.hdr h1{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.hdr p{font-size:11px;color:var(--muted);margin-top:1px}
+.tabs{display:flex;gap:2px}
+.tab-btn{padding:6px 15px;border:none;background:none;cursor:pointer;font-size:12px;color:var(--muted);border-radius:6px;transition:background .15s,color .15s}
+.tab-btn:hover{background:#f0f0ee;color:var(--text)}
+.tab-btn.active{background:var(--accent);color:#fff;font-weight:500}
+
+/* ── MONTH BAR ── */
+.mbar{background:var(--card);border-bottom:1px solid var(--border);padding:9px 24px;display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none}
+.mbar::-webkit-scrollbar{display:none}
+.mbar-lbl{font-size:11px;color:var(--muted);font-weight:500;margin-right:2px;white-space:nowrap}
+.m-btn{padding:4px 14px;border-radius:20px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:12px;color:var(--muted);transition:all .15s;white-space:nowrap}
+.m-btn:hover:not(.active){border-color:var(--accent);color:var(--accent)}
+.m-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:500}
+.m-btn.medias{font-style:italic}
+
+/* ── CONTENT ── */
+.content{padding:18px 24px;max-width:1300px;margin:0 auto}
+
+/* ── SUMMARY STRIP ── */
+.sstrip{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
+.scard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:13px 15px}
+.scard .sl{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.scard .sv{font-size:20px;font-weight:700;margin-top:4px;letter-spacing:-.02em;line-height:1.1}
+.scard .ss{font-size:11px;color:var(--muted);margin-top:3px}
+.scard .spct{font-size:12px;font-weight:600;margin-top:3px}
+
+/* ── SECTION HEADER ── */
+.sh{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:18px 0 9px;display:flex;align-items:center;gap:8px}
+.sh::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── KPI GRID ── */
+.kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-bottom:4px}
+
+/* ── KPI CARD ── */
+.kcard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:13px 14px;display:flex;flex-direction:column;transition:box-shadow .15s}
+.kcard:hover{box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.kc-head{display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.kdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.kname{font-size:11px;color:var(--muted);font-weight:500;flex:1;line-height:1.3}
+.kresult{font-size:22px;font-weight:700;letter-spacing:-.03em;line-height:1;margin-bottom:9px}
+.kdetails{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+.krow{display:flex;justify-content:space-between;align-items:baseline;font-size:11px}
+.krow .lbl{color:var(--muted)}
+.krow .val{font-weight:600}
+.krow .val.ok{color:var(--green)}.krow .val.warn{color:var(--yellow)}.krow .val.bad{color:var(--red)}
+.kpct-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:11px}
+.kpct-row .plbl{color:var(--muted)}
+.kpct-main{font-size:13px;font-weight:700}
+.pbar-bg{height:3px;background:#e9e9e9;border-radius:2px;margin-bottom:8px;overflow:hidden}
+.pbar-fill{height:100%;border-radius:2px;transition:width .4s}
+
+/* status */
+.c-g{color:var(--green)}.c-y{color:var(--yellow)}.c-r{color:var(--red)}.c-m{color:var(--muted)}
+.dot-g{background:var(--green)}.dot-y{background:var(--yellow)}.dot-r{background:var(--red)}.dot-m{background:#d1d5db}
+.bar-g{background:var(--green)}.bar-y{background:var(--yellow)}.bar-r{background:var(--red)}.bar-m{background:#d1d5db}
+.bar-a{background:var(--accent)}
+
+/* ── AREA GRID (liminares / sentenças / recursos) ── */
+.area-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:4px}
+.acard{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.acard-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:5px}
+.atag{padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.atag-g{background:#ecfdf5;color:#065f46}
+.atag-s{background:#eff6ff;color:#1e40af}
+.atag-b{background:#faf5ff;color:#6d28d9}
+.arow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #f0f0ee;font-size:12px}
+.arow:last-of-type{border-bottom:none}
+.arow .albl{color:var(--muted)}
+.arow .aval{font-weight:700;display:flex;align-items:center;gap:5px}
+.arow .aval small{font-weight:400;color:var(--muted);font-size:10px}
+.ataxa{margin-top:10px;padding:7px 0 0;border-top:1px solid var(--border)}
+.ataxa-lbl{font-size:10px;color:var(--muted);margin-bottom:4px}
+.ataxa-val{font-size:16px;font-weight:700}
+.ataxa-bar{height:4px;background:#e9e9e9;border-radius:2px;margin-top:5px;overflow:hidden}
+.ataxa-fill{height:100%;border-radius:2px;transition:width .4s}
+
+/* ── TAB CONTENT ── */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* ── ACUMULADO TAB ── */
+.acum-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin-bottom:18px}
+.acum-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+.acum-card .al{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.acum-card .av{font-size:18px;font-weight:700;letter-spacing:-.02em;margin-top:5px}
+.acum-card .as{font-size:11px;color:var(--muted);margin-top:2px}
+.acum-card .apct{font-size:12px;font-weight:600;margin-top:4px}
+
+.chart-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px}
+.chart-box h3{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+
+/* ── TABLE ── */
+.tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th{padding:8px 12px;text-align:left;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:#fafaf8;border-bottom:1px solid var(--border)}
+th.r{text-align:right}
+td{padding:7px 12px;border-bottom:1px solid #f0f0ee}
+td.r{text-align:right;font-weight:500}
+td.kn{font-weight:600;color:var(--text)}
+td.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:#fafaf8;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#fafaf8}
+.tpct{display:inline-flex;align-items:center;gap:3px;font-weight:600}
+.tdot{width:5px;height:5px;border-radius:50%;display:inline-block;flex-shrink:0}
+
+/* ── LOADING ── */
+.loading-msg{color:var(--muted);font-size:12px;padding:30px 0;text-align:center;grid-column:1/-1}
+.err-msg{color:var(--red);font-size:12px;padding:20px 0;text-align:center;grid-column:1/-1}
+
+/* ── REFRESH BTN ── */
+.refresh-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;color:var(--muted);transition:all .15s}
+.refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+@media(max-width:900px){
+  .area-grid{grid-template-columns:1fr 1fr}
+  .sstrip{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:640px){
+  .hdr{padding:11px 16px;flex-direction:column;align-items:flex-start;gap:8px}
+  .content{padding:14px 16px}
+  .sstrip{grid-template-columns:1fr 1fr}
+  .area-grid{grid-template-columns:1fr}
+  .kgrid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:420px){
+  .kgrid{grid-template-columns:1fr}
+  .sstrip{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <h1>KPIs Processual</h1>
+    <p id="hdr-sub">BM Advocacia &amp; Consultoria · carregando…</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button class="refresh-btn" onclick="manualRefresh()" title="Atualizar dados">⟳ Atualizar</button>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('mensal',this)">Visão por Mês</button>
+      <button class="tab-btn" onclick="switchTab('acumulado',this)">Acumulado</button>
+    </div>
+  </div>
+</div>
+
+<!-- MONTH BAR -->
+<div class="mbar" id="mbar"><span class="mbar-lbl">Carregando…</span></div>
+
+<!-- ══ TAB: MENSAL ══ -->
+<div id="tab-mensal" class="tab-content active">
+  <div class="content">
+    <div class="sstrip" id="sstrip"><div class="loading-msg">⟳ Carregando…</div></div>
+
+    <div class="sh">Operacional</div>
+    <div class="kgrid" id="g-operacional"><div class="loading-msg">⟳</div></div>
+
+    <div class="sh">Captação de Clientes &amp; Processos</div>
+    <div class="kgrid" id="g-captacao"></div>
+
+    <div class="sh">Relacionamento com Clientes</div>
+    <div class="kgrid" id="g-relacionamento"></div>
+
+    <div class="sh">Liminares</div>
+    <div class="kgrid" id="g-lim-top"></div>
+    <div class="area-grid" id="g-liminares"></div>
+
+    <div class="sh">Sentenças</div>
+    <div class="kgrid" id="g-sent-top"></div>
+    <div class="area-grid" id="g-sentencas"></div>
+
+    <div class="sh">Recursos</div>
+    <div class="kgrid" id="g-rec-top"></div>
+    <div class="area-grid" id="g-recursos"></div>
+
+    <div class="sh">Financeiro</div>
+    <div class="kgrid" id="g-financeiro"></div>
+
+    <div style="height:24px"></div>
+  </div>
+</div>
+
+<!-- ══ TAB: ACUMULADO ══ -->
+<div id="tab-acumulado" class="tab-content">
+  <div class="content">
+    <div class="sh" style="margin-top:4px">Médias &amp; Totais — 2026</div>
+    <div class="acum-grid" id="acum-grid"><div class="loading-msg">⟳ Carregando…</div></div>
+
+    <div class="sh">Evolução por Área</div>
+    <div id="evo-charts"></div>
+
+    <div class="sh">Tabela Completa — Resultado por Mês</div>
+    <div class="tbl-wrap"><table id="acum-table"><thead><tr><th>Indicador</th></tr></thead><tbody></tbody></table></div>
+
+    <div style="height:24px"></div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════
+//  CONFIGURAÇÃO
+// ════════════════════════════════════════════════════════
+const SHEET_ID = '1MHK5vTiNq1nmvCqJLG6jacfr4inpJuvHzRyFAklKeLQ';
+const GID      = '38571557';
+const POLL_MS  = 5 * 60 * 1000;
+
+// ════════════════════════════════════════════════════════
+//  DEFINIÇÕES DOS KPIs
+// ════════════════════════════════════════════════════════
+// dir: 'maior' = maior é melhor | 'menor' = menor é melhor | 'info' = sem meta
+// subsection: string — usado para KPIs que aparecem repetidos em sub-seções
+const KPI_DEFS = [
+  // Operacional
+  { id:'publicacoes',      nome:'Publicações',           grupo:'operacional',      fmt:'numero', dir:'maior', match:'publicacoes' },
+  { id:'prazos_total',     nome:'Prazos (Total)',         grupo:'operacional',      fmt:'numero', dir:'maior', match:'prazos [total]' },
+  { id:'prazos_simples',   nome:'Prazos Simples',         grupo:'operacional',      fmt:'numero', dir:'maior', match:'prazos simples' },
+  { id:'prazos_complexos', nome:'Prazos Complexos',       grupo:'operacional',      fmt:'numero', dir:'maior', match:'prazos complexos' },
+  { id:'audiencias',       nome:'Audiências Realizadas',  grupo:'operacional',      fmt:'numero', dir:'maior', match:'audiencias realizadas' },
+  { id:'dilig_r',          nome:'Diligências Realizadas', grupo:'operacional',      fmt:'numero', dir:'maior', match:'diligencias realizadas' },
+  { id:'dilig_f',          nome:'Diligências Finalizadas',grupo:'operacional',      fmt:'numero', dir:'maior', match:'diligencias finalizadas' },
+  // Captação
+  { id:'novos_clientes',   nome:'Novos Clientes',         grupo:'captacao',         fmt:'numero', dir:'maior', match:'novos clientes' },
+  { id:'onboarding',       nome:'Onboarding Realizadas',  grupo:'captacao',         fmt:'numero', dir:'maior', match:'onboarding realizadas' },
+  { id:'peticoes',         nome:'Petições Iniciais',      grupo:'captacao',         fmt:'numero', dir:'maior', match:'peticoes iniciais' },
+  { id:'processos_dist',   nome:'Processos Distribuídos', grupo:'captacao',         fmt:'numero', dir:'maior', match:'processos distribuidos' },
+  { id:'processos_rep',    nome:'Processos Repropostos',  grupo:'captacao',         fmt:'numero', dir:'info',  match:'processos repropostos' },
+  // Relacionamento
+  { id:'feedback',         nome:'Feedback aos Clientes',  grupo:'relacionamento',   fmt:'numero', dir:'maior', match:'feedback aos clientes' },
+  { id:'mapeamentos',      nome:'Mapeamentos',            grupo:'relacionamento',   fmt:'numero', dir:'maior', match:'mapeamentos' },
+  { id:'pesquisa',         nome:'Pesquisa de Satisfação', grupo:'relacionamento',   fmt:'numero', dir:'maior', match:'pesquisa de satisfacao' },
+  // Liminares — topo
+  { id:'lim_sol',          nome:'Liminares Solicitadas',  grupo:'lim_top',          fmt:'numero', dir:'maior', match:'liminares solicitadas' },
+  { id:'lim_nj',           nome:'Não Julgadas (aguardando)',grupo:'lim_top',        fmt:'numero', dir:'info',  match:'liminares nao julgadas' },
+  // Liminares — por área
+  { id:'lim_def_geral',    nome:'Deferidas',              grupo:'liminares_geral',  fmt:'numero', dir:'maior', match:'liminares deferidas',   subsection:'geral' },
+  { id:'lim_ind_geral',    nome:'Indeferidas',            grupo:'liminares_geral',  fmt:'numero', dir:'menor', match:'liminares indeferidas', subsection:'geral' },
+  { id:'lim_def_saude',    nome:'Deferidas',              grupo:'liminares_saude',  fmt:'numero', dir:'maior', match:'liminares deferidas',   subsection:'saude' },
+  { id:'lim_ind_saude',    nome:'Indeferidas',            grupo:'liminares_saude',  fmt:'numero', dir:'menor', match:'liminares indeferidas', subsection:'saude' },
+  { id:'lim_def_ban',      nome:'Deferidas',              grupo:'liminares_bancario',fmt:'numero',dir:'maior', match:'liminares deferidas',   subsection:'bancario' },
+  { id:'lim_ind_ban',      nome:'Indeferidas',            grupo:'liminares_bancario',fmt:'numero',dir:'menor', match:'liminares indeferidas', subsection:'bancario' },
+  // Sentenças — topo
+  { id:'sent_merito',      nome:'Sentenças de Mérito',    grupo:'sent_top',         fmt:'numero', dir:'maior', match:'sentencas de merito' },
+  { id:'sent_ext',         nome:'Sentenças de Extinção',  grupo:'sent_top',         fmt:'numero', dir:'info',  match:'sentencas de extincao' },
+  // Sentenças — por área
+  { id:'sent_proc_geral',  nome:'Procedentes',            grupo:'sentencas_geral',  fmt:'numero', dir:'maior', match:'sentencas procedentes',    subsection:'geral' },
+  { id:'sent_impr_geral',  nome:'Improcedentes',          grupo:'sentencas_geral',  fmt:'numero', dir:'menor', match:'sentencas improcedentes',  subsection:'geral' },
+  { id:'sent_proc_saude',  nome:'Procedentes',            grupo:'sentencas_saude',  fmt:'numero', dir:'maior', match:'sentencas procedentes',    subsection:'saude' },
+  { id:'sent_impr_saude',  nome:'Improcedentes',          grupo:'sentencas_saude',  fmt:'numero', dir:'menor', match:'sentencas improcedentes',  subsection:'saude' },
+  { id:'sent_proc_ban',    nome:'Procedentes',            grupo:'sentencas_bancario',fmt:'numero',dir:'maior', match:'sentencas procedentes',    subsection:'bancario' },
+  { id:'sent_impr_ban',    nome:'Improcedentes',          grupo:'sentencas_bancario',fmt:'numero',dir:'menor', match:'sentencas improcedentes',  subsection:'bancario' },
+  // Recursos — topo
+  { id:'rec_julgados',     nome:'Recursos Julgados',      grupo:'rec_top',          fmt:'numero', dir:'maior', match:'recursos julgados' },
+  // Recursos — por área
+  { id:'rec_pos_geral',    nome:'Resultado Positivo',     grupo:'recursos_geral',   fmt:'numero', dir:'maior', match:'resultado positivo',  subsection:'geral' },
+  { id:'rec_neg_geral',    nome:'Resultado Negativo',     grupo:'recursos_geral',   fmt:'numero', dir:'menor', match:'resultado negativo',  subsection:'geral' },
+  { id:'rec_pos_saude',    nome:'Resultado Positivo',     grupo:'recursos_saude',   fmt:'numero', dir:'maior', match:'resultado positivo',  subsection:'saude' },
+  { id:'rec_neg_saude',    nome:'Resultado Negativo',     grupo:'recursos_saude',   fmt:'numero', dir:'menor', match:'resultado negativo',  subsection:'saude' },
+  { id:'rec_pos_ban',      nome:'Resultado Positivo',     grupo:'recursos_bancario',fmt:'numero', dir:'maior', match:'resultado positivo',  subsection:'bancario' },
+  { id:'rec_neg_ban',      nome:'Resultado Negativo',     grupo:'recursos_bancario',fmt:'numero', dir:'menor', match:'resultado negativo',  subsection:'bancario' },
+  // Financeiro
+  { id:'alvaras',          nome:'Alvarás Creditados',     grupo:'financeiro',       fmt:'moeda',  dir:'maior', match:'alvaras creditados' },
+  { id:'acordos',          nome:'Acordos Firmados',       grupo:'financeiro',       fmt:'moeda',  dir:'maior', match:'acordos firmados' },
+  { id:'hon_alvaras',      nome:'Honorários (Alvarás)',   grupo:'financeiro',       fmt:'moeda',  dir:'maior', match:'honorarios de exito (alvaras)' },
+  { id:'hon_acordos',      nome:'Honorários (Acordos)',   grupo:'financeiro',       fmt:'moeda',  dir:'maior', match:'honorarios de exito (acordos)' },
+  { id:'hon_total',        nome:'Honorários de Êxito',   grupo:'financeiro',       fmt:'moeda',  dir:'maior', match:'honorarios de exito [total]' },
+];
+
+// ════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ════════════════════════════════════════════════════════
+let PARSED        = null; // { monthCols, mediasCol, data }
+let MONTHS        = [];   // [{abbr, full, col, pctCol}]
+let MEDIAS_COL    = null; // {abbr:'Méd', col, pctCol}
+let DATA          = {};   // {kpiId: {meta, months:{abbr:{result,pct}}, medias:{result,pct}}}
+let mesSel        = null;
+let lastHash      = '';
+let pollingTimer  = null;
+let evoCharts     = [];
+let activeTab     = 'mensal';
+
+// ════════════════════════════════════════════════════════
+//  FETCH
+// ════════════════════════════════════════════════════════
+function gvizUrl() {
+  return 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
+    '/gviz/tq?tqx=out:json&headers=0&gid=' + GID;
+}
+
+async function fetchData() {
+  try {
+    var resp = await fetch(gvizUrl());
+    var text = await resp.text();
+    var match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+    if (!match) return null;
+    var json = JSON.parse(match[1]);
+    if (json.status === 'error') return null;
+    return json.table;
+  } catch(e) { return null; }
+}
+
+// ════════════════════════════════════════════════════════
+//  PARSE
+// ════════════════════════════════════════════════════════
+function normStr(s) {
+  if (typeof s !== 'string') s = s ? String(s) : '';
+  return s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+}
+
+function cellV(row, col) {
+  if (!row || !row.c || col >= row.c.length) return null;
+  var cell = row.c[col];
+  return (cell && cell.v !== undefined && cell.v !== null) ? cell.v : null;
+}
+
+function cellF(row, col) {
+  if (!row || !row.c || col >= row.c.length) return null;
+  var cell = row.c[col];
+  return cell ? (cell.f || null) : null;
+}
+
+function extractPct(row, col) {
+  var f = cellF(row, col);
+  var v = cellV(row, col);
+  if (v === null) return null;
+  if (f && String(f).includes('%')) {
+    var p = parseFloat(String(f).replace(/[^0-9.\-]/g,''));
+    return isNaN(p) ? null : p;
+  }
+  if (typeof v === 'number') {
+    // ratio (<=3) vs whole percent (>3)
+    return v <= 3 ? v * 100 : v;
+  }
+  if (typeof v === 'string' && v.includes('%')) {
+    return parseFloat(v) || null;
+  }
+  return null;
+}
+
+const MONTH_ABBRS = {
+  'janeiro':'Jan','fevereiro':'Fev','marco':'Mar','abril':'Abr',
+  'maio':'Mai','junho':'Jun','julho':'Jul','agosto':'Ago',
+  'setembro':'Set','outubro':'Out','novembro':'Nov','dezembro':'Dez'
+};
+
+const SECTION_TITLES = new Set([
+  'publicacoes, prazos, audiencias e diligencias',
+  'mapeamentos e feedbacks aos clientes',
+  'novos clientes e processos',
+  'resultados de processos - liminares',
+  'sentencas','recursos','alvaras e acordos'
+]);
+
+const SUBSECTIONS = new Set(['geral','saude','bancario']);
+
+function parseTable(table) {
+  if (!table || !table.rows || !table.rows.length) return null;
+  var rows = table.rows;
+
+  // Row 0 = header: detect month columns
+  var hdr = rows[0];
+  var monthCols  = [];
+  var mediasCol  = null;
+  var metaColIdx = 1;
+
+  for (var i = 0; i < (hdr.c || []).length; i++) {
+    var hv = cellV(hdr, i);
+    if (!hv) continue;
+    var hn = normStr(hv);
+    if (hn === 'medias' || hn === 'medias ') {
+      mediasCol = { abbr:'Méd', full:'Médias', col:i, pctCol:i+1 };
+    } else if (MONTH_ABBRS[hn]) {
+      monthCols.push({ abbr:MONTH_ABBRS[hn], full:String(hv), col:i, pctCol:i+1 });
+    } else if (hn.includes('meta')) {
+      metaColIdx = i;
+    }
+  }
+
+  // Build match → defs lookup
+  var KPI_BY_MATCH = {};
+  KPI_DEFS.forEach(function(def) {
+    if (!KPI_BY_MATCH[def.match]) KPI_BY_MATCH[def.match] = [];
+    KPI_BY_MATCH[def.match].push(def);
+  });
+
+  // Init data store
+  var data = {};
+  KPI_DEFS.forEach(function(def) {
+    data[def.id] = { meta:null, months:{}, medias:{result:null,pct:null} };
+  });
+
+  var currentSubSection = null;
+
+  for (var r = 1; r < rows.length; r++) {
+    var row = rows[r];
+    var nameVal = cellV(row, 0);
+    if (!nameVal) continue;
+    var n = normStr(nameVal);
+
+    // Section header?
+    if (SECTION_TITLES.has(n)) { currentSubSection = null; continue; }
+    // Sub-section header?
+    if (SUBSECTIONS.has(n)) { currentSubSection = n; continue; }
+
+    var candidates = KPI_BY_MATCH[n];
+    if (!candidates || !candidates.length) continue;
+
+    var def;
+    if (candidates.length === 1) {
+      def = candidates[0];
+    } else {
+      def = candidates.find(function(d){ return d.subsection === currentSubSection; });
+      if (!def) def = candidates[0];
+    }
+
+    var meta = cellV(row, metaColIdx);
+    data[def.id].meta = (meta !== null && meta !== '') ? meta : null;
+
+    monthCols.forEach(function(mc) {
+      var result = cellV(row, mc.col);
+      var pct    = extractPct(row, mc.pctCol);
+      data[def.id].months[mc.abbr] = { result:(result !== null ? result : null), pct:pct };
+    });
+
+    if (mediasCol) {
+      var mr = cellV(row, mediasCol.col);
+      var mp = extractPct(row, mediasCol.pctCol);
+      data[def.id].medias = { result:(mr !== null ? mr : null), pct:mp };
+    }
+  }
+
+  return { monthCols:monthCols, mediasCol:mediasCol, data:data };
+}
+
+// ════════════════════════════════════════════════════════
+//  FORMATAÇÃO
+// ════════════════════════════════════════════════════════
+function fmtNum(v) {
+  if (v === null || v === undefined) return '—';
+  return Number(v).toLocaleString('pt-BR');
+}
+
+function fmtMoeda(v) {
+  if (v === null || v === undefined) return '—';
+  var n = Number(v);
+  if (n >= 1000000) return 'R$ ' + (n/1000000).toLocaleString('pt-BR',{maximumFractionDigits:1}) + 'M';
+  if (n >= 1000)    return 'R$ ' + (n/1000).toLocaleString('pt-BR',{maximumFractionDigits:1}) + 'k';
+  return 'R$ ' + n.toLocaleString('pt-BR',{minimumFractionDigits:0,maximumFractionDigits:0});
+}
+
+function fmtMoedaFull(v) {
+  if (v === null || v === undefined) return '—';
+  return 'R$ ' + Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
+function fmt(v, f) { return f === 'moeda' ? fmtMoeda(v) : fmtNum(v); }
+
+function fmtPct(p) {
+  if (p === null || p === undefined) return '—';
+  return Number(p).toFixed(1).replace('.',',') + '%';
+}
+
+function colorInfo(pct, dir) {
+  if (pct === null || dir === 'info') return { cls:'c-m', dotCls:'dot-m', barCls:'bar-m' };
+  var p = Number(pct);
+  if (dir === 'maior') {
+    if (p >= 100) return { cls:'c-g', dotCls:'dot-g', barCls:'bar-g' };
+    if (p >= 70)  return { cls:'c-y', dotCls:'dot-y', barCls:'bar-y' };
+    return { cls:'c-r', dotCls:'dot-r', barCls:'bar-r' };
+  } else { // menor = less is better (e.g. indeferidas)
+    if (p <= 80)  return { cls:'c-g', dotCls:'dot-g', barCls:'bar-g' };
+    if (p <= 120) return { cls:'c-y', dotCls:'dot-y', barCls:'bar-y' };
+    return { cls:'c-r', dotCls:'dot-r', barCls:'bar-r' };
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  CONSTRUÇÃO DE CARDS
+// ════════════════════════════════════════════════════════
+function getKpiForSel(id) {
+  var d = DATA[id];
+  if (!d) return null;
+  if (mesSel === 'Méd') {
+    return { result: d.medias.result, pct: d.medias.pct, meta: d.meta };
+  }
+  var m = d.months[mesSel];
+  return m ? { result: m.result, pct: m.pct, meta: d.meta } : { result:null, pct:null, meta:d.meta };
+}
+
+function kpiCard(id) {
+  var def = KPI_DEFS.find(function(d){ return d.id===id; });
+  if (!def) return '';
+  var kpi = getKpiForSel(id);
+  if (!kpi) return '';
+  var ci  = colorInfo(kpi.pct, def.dir);
+  var pctBarW = (kpi.pct !== null) ? Math.min(Math.max(Number(kpi.pct),0),150) + '%' : '0%';
+
+  return '<div class="kcard">' +
+    '<div class="kc-head">' +
+      '<div class="kdot ' + ci.dotCls + '"></div>' +
+      '<div class="kname">' + def.nome + '</div>' +
+    '</div>' +
+    '<div class="kresult">' + fmt(kpi.result, def.fmt) + '</div>' +
+    '<div class="kdetails">' +
+      (kpi.meta !== null ? '<div class="krow"><span class="lbl">Meta mensal</span><span class="val">' + fmt(kpi.meta, def.fmt) + '</span></div>' : '') +
+    '</div>' +
+    (def.dir !== 'info' ? (
+      '<div class="kpct-row"><span class="plbl">% da meta</span>' +
+      '<span class="kpct-main ' + ci.cls + '">' + fmtPct(kpi.pct) + '</span></div>' +
+      '<div class="pbar-bg"><div class="pbar-fill ' + ci.barCls + '" style="width:' + pctBarW + '"></div></div>'
+    ) : '') +
+  '</div>';
+}
+
+function areaCard(section, area, areaLabel, tagClass) {
+  var prefix = {
+    'liminares': { pos:'lim_def', neg:'lim_ind', posLabel:'Deferidas', negLabel:'Indeferidas', taxaLabel:'Taxa de Deferimento' },
+    'sentencas':  { pos:'sent_proc', neg:'sent_impr', posLabel:'Procedentes', negLabel:'Improcedentes', taxaLabel:'Taxa de Êxito' },
+    'recursos':   { pos:'rec_pos', neg:'rec_neg', posLabel:'Resultado Positivo', negLabel:'Resultado Negativo', taxaLabel:'Taxa Positiva' },
+  }[section];
+  if (!prefix) return '';
+
+  var areaKey = { 'geral':'geral', 'saude':'saude', 'bancario':'ban' }[area];
+  var posId = prefix.pos + '_' + areaKey;
+  var negId = prefix.neg + '_' + areaKey;
+
+  var posKpi = getKpiForSel(posId) || { result:null, pct:null, meta:null };
+  var negKpi = getKpiForSel(negId) || { result:null, pct:null, meta:null };
+
+  var posVal = posKpi.result !== null ? Number(posKpi.result) : 0;
+  var negVal = negKpi.result !== null ? Number(negKpi.result) : 0;
+  var total  = posVal + negVal;
+  var taxa   = total > 0 ? Math.round(posVal / total * 100) : null;
+
+  var posCi = colorInfo(posKpi.pct, 'maior');
+  var negCi = colorInfo(negKpi.pct, 'menor');
+  var taxaCi = taxa !== null ? (taxa >= 50 ? 'c-g' : taxa >= 30 ? 'c-y' : 'c-r') : 'c-m';
+  var taxaBarColor = taxa !== null ? (taxa >= 50 ? 'bar-g' : taxa >= 30 ? 'bar-y' : 'bar-r') : 'bar-m';
+
+  return '<div class="acard">' +
+    '<div class="acard-title">' +
+      '<span class="atag ' + tagClass + '">' + areaLabel + '</span>' +
+    '</div>' +
+    '<div class="arow">' +
+      '<span class="albl">' + prefix.posLabel + '</span>' +
+      '<span class="aval ' + posCi.cls + '">' +
+        (posKpi.result !== null ? fmtNum(posKpi.result) : '—') +
+        (posKpi.meta !== null ? '<small>/ ' + fmtNum(posKpi.meta) + ' meta</small>' : '') +
+      '</span>' +
+    '</div>' +
+    '<div class="arow">' +
+      '<span class="albl">' + prefix.negLabel + '</span>' +
+      '<span class="aval ' + negCi.cls + '">' +
+        (negKpi.result !== null ? fmtNum(negKpi.result) : '—') +
+        (negKpi.meta !== null ? '<small>/ ' + fmtNum(negKpi.meta) + ' meta</small>' : '') +
+      '</span>' +
+    '</div>' +
+    '<div class="ataxa">' +
+      '<div class="ataxa-lbl">' + prefix.taxaLabel + ' (' + posVal + ' de ' + total + ')</div>' +
+      '<div class="ataxa-val ' + taxaCi + '">' + (taxa !== null ? taxa + '%' : '—') + '</div>' +
+      '<div class="ataxa-bar"><div class="ataxa-fill ' + taxaBarColor + '" style="width:' + (taxa||0) + '%"></div></div>' +
+    '</div>' +
+  '</div>';
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER MENSAL
+// ════════════════════════════════════════════════════════
+function renderMensal() {
+  // Summary strip
+  var posLim  = getKpiForSel('lim_def_geral');
+  var saudLim = getKpiForSel('lim_def_saude');
+  var banLim  = getKpiForSel('lim_def_ban');
+  var solLim  = getKpiForSel('lim_sol');
+  var totalDef  = (posLim&&posLim.result?Number(posLim.result):0) +
+                  (saudLim&&saudLim.result?Number(saudLim.result):0) +
+                  (banLim&&banLim.result?Number(banLim.result):0);
+  var solVal    = solLim&&solLim.result?Number(solLim.result):0;
+  var taxaLim   = solVal > 0 ? Math.round(totalDef/solVal*100) : null;
+
+  var posS  = getKpiForSel('sent_proc_geral');
+  var sauS  = getKpiForSel('sent_proc_saude');
+  var banS  = getKpiForSel('sent_proc_ban');
+  var impG  = getKpiForSel('sent_impr_geral');
+  var impSa = getKpiForSel('sent_impr_saude');
+  var impBa = getKpiForSel('sent_impr_ban');
+  var totalProc = (posS&&posS.result?Number(posS.result):0)+(sauS&&sauS.result?Number(sauS.result):0)+(banS&&banS.result?Number(banS.result):0);
+  var totalImpr = (impG&&impG.result?Number(impG.result):0)+(impSa&&impSa.result?Number(impSa.result):0)+(impBa&&impBa.result?Number(impBa.result):0);
+  var taxaSent  = (totalProc+totalImpr) > 0 ? Math.round(totalProc/(totalProc+totalImpr)*100) : null;
+
+  var procDist = getKpiForSel('processos_dist');
+  var honTot   = getKpiForSel('hon_total');
+  var alvaras  = getKpiForSel('alvaras');
+
+  var scPD = colorInfo(procDist&&procDist.pct, 'maior');
+  var scHT = colorInfo(honTot&&honTot.pct, 'maior');
+  var scAL = colorInfo(alvaras&&alvaras.pct, 'maior');
+  var scTL = taxaLim!==null ? (taxaLim>=40?'c-g':'c-y') : 'c-m';
+  var scTS = taxaSent!==null ? (taxaSent>=50?'c-g':'c-y') : 'c-m';
+
+  document.getElementById('sstrip').innerHTML =
+    scard('Processos Distribuídos', procDist&&procDist.result!==null?fmtNum(procDist.result):'—', procDist&&procDist.meta?('meta: '+fmtNum(procDist.meta)):'', procDist&&procDist.pct!==null?fmtPct(procDist.pct):'', scPD.cls) +
+    scard('Honorários de Êxito',    honTot&&honTot.result!==null?fmtMoeda(honTot.result):'—',    honTot&&honTot.meta?('meta: '+fmtMoeda(honTot.meta)):'', honTot&&honTot.pct!==null?fmtPct(honTot.pct):'', scHT.cls) +
+    scard('Alvarás Creditados',      alvaras&&alvaras.result!==null?fmtMoeda(alvaras.result):'—', alvaras&&alvaras.meta?('meta: '+fmtMoeda(alvaras.meta)):'', alvaras&&alvaras.pct!==null?fmtPct(alvaras.pct):'', scAL.cls) +
+    scard('Taxa de Deferimento',     taxaLim!==null?taxaLim+'%':'—', totalDef+' def. de '+solVal+' sol.', '', scTL) +
+    scard('Taxa de Êxito (Sent.)',   taxaSent!==null?taxaSent+'%':'—', totalProc+' proc. de '+(totalProc+totalImpr), '', scTS);
+
+  // Grupos
+  renderGroup('g-operacional',    KPI_DEFS.filter(function(d){return d.grupo==='operacional';}));
+  renderGroup('g-captacao',       KPI_DEFS.filter(function(d){return d.grupo==='captacao';}));
+  renderGroup('g-relacionamento', KPI_DEFS.filter(function(d){return d.grupo==='relacionamento';}));
+  renderGroup('g-lim-top',        KPI_DEFS.filter(function(d){return d.grupo==='lim_top';}));
+  renderGroup('g-sent-top',       KPI_DEFS.filter(function(d){return d.grupo==='sent_top';}));
+  renderGroup('g-rec-top',        KPI_DEFS.filter(function(d){return d.grupo==='rec_top';}));
+  renderGroup('g-financeiro',     KPI_DEFS.filter(function(d){return d.grupo==='financeiro';}));
+
+  // Área cards
+  document.getElementById('g-liminares').innerHTML =
+    areaCard('liminares','geral','Geral','atag-g') +
+    areaCard('liminares','saude','Saúde','atag-s') +
+    areaCard('liminares','bancario','Bancário','atag-b');
+  document.getElementById('g-sentencas').innerHTML =
+    areaCard('sentencas','geral','Geral','atag-g') +
+    areaCard('sentencas','saude','Saúde','atag-s') +
+    areaCard('sentencas','bancario','Bancário','atag-b');
+  document.getElementById('g-recursos').innerHTML =
+    areaCard('recursos','geral','Geral','atag-g') +
+    areaCard('recursos','saude','Saúde','atag-s') +
+    areaCard('recursos','bancario','Bancário','atag-b');
+}
+
+function scard(label, val, sub, pct, cls) {
+  return '<div class="scard"><div class="sl">' + label + '</div>' +
+    '<div class="sv">' + val + '</div>' +
+    (sub ? '<div class="ss">' + sub + '</div>' : '') +
+    (pct ? '<div class="spct ' + cls + '">' + pct + '</div>' : '') +
+  '</div>';
+}
+
+function renderGroup(elId, defs) {
+  var el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = defs.map(function(d){ return kpiCard(d.id); }).join('') || '<div class="err-msg">Sem dados</div>';
+}
+
+// ════════════════════════════════════════════════════════
+//  RENDER ACUMULADO
+// ════════════════════════════════════════════════════════
+function renderAcumulado() {
+  if (!MEDIAS_COL && MONTHS.length === 0) {
+    document.getElementById('acum-grid').innerHTML = '<div class="err-msg">Sem dados acumulados disponíveis.</div>';
+    return;
+  }
+
+  // Summary cards using MÉDIAS column or last available month
+  var acumDefs = [
+    'processos_dist','peticoes','novos_clientes',
+    'prazos_total','audiencias',
+    'lim_sol','alvaras','hon_total','acordos'
+  ];
+
+  var html = '';
+  acumDefs.forEach(function(id) {
+    var def = KPI_DEFS.find(function(d){ return d.id===id; });
+    if (!def) return;
+    var d   = DATA[id];
+    if (!d) return;
+    var val, pct;
+    if (MEDIAS_COL) {
+      val = d.medias.result;
+      pct = d.medias.pct;
+    } else {
+      var last = MONTHS[MONTHS.length-1];
+      var m = d.months[last.abbr];
+      val = m ? m.result : null;
+      pct = m ? m.pct : null;
+    }
+    var ci = colorInfo(pct, def.dir);
+    html += '<div class="acum-card">' +
+      '<div class="al">' + def.nome + '</div>' +
+      '<div class="av">' + fmt(val, def.fmt) + '</div>' +
+      '<div class="as">Meta: ' + fmt(d.meta, def.fmt) + '</div>' +
+      (def.dir !== 'info' ? '<div class="apct ' + ci.cls + '">' + fmtPct(pct) + '</div>' : '') +
+    '</div>';
+  });
+  document.getElementById('acum-grid').innerHTML = html || '<div class="err-msg">Sem dados</div>';
+
+  // Evolution charts
+  renderEvoCharts();
+
+  // Table
+  renderAcumTable();
+}
+
+function renderEvoCharts() {
+  evoCharts.forEach(function(c){ try{ c.destroy(); }catch(e){} });
+  evoCharts = [];
+
+  var CHART_GROUPS = [
+    { title:'Operacional', ids:['publicacoes','prazos_total','audiencias'] },
+    { title:'Captação',    ids:['processos_dist','peticoes','novos_clientes'] },
+    { title:'Financeiro',  ids:['alvaras','hon_total','acordos'] },
+  ];
+
+  var container = document.getElementById('evo-charts');
+  container.innerHTML = '';
+
+  var labels = MONTHS.map(function(m){ return m.full || m.abbr; });
+  if (MEDIAS_COL) labels.push('Médias');
+
+  var COLORS = ['#0f766e','#1e40af','#7c3aed','#dc2626','#ca8a04'];
+
+  CHART_GROUPS.forEach(function(grp) {
+    var box = document.createElement('div');
+    box.className = 'chart-box';
+    box.innerHTML = '<h3>' + grp.title + '</h3><canvas height="90"></canvas>';
+    container.appendChild(box);
+    var canvas = box.querySelector('canvas');
+
+    var datasets = grp.ids.map(function(id, i) {
+      var def = KPI_DEFS.find(function(d){ return d.id===id; });
+      var d   = DATA[id];
+      if (!def || !d) return null;
+      var vals = MONTHS.map(function(m){ var mo = d.months[m.abbr]; return mo ? mo.result : null; });
+      if (MEDIAS_COL) vals.push(d.medias.result);
+      return {
+        label: def.nome,
+        data: vals,
+        borderColor: COLORS[i % COLORS.length],
+        backgroundColor: COLORS[i % COLORS.length] + '18',
+        borderWidth: 2,
+        pointRadius: 4,
+        tension: 0.3,
+        fill: false,
+      };
+    }).filter(Boolean);
+
+    var chart = new Chart(canvas, {
+      type: 'line',
+      data: { labels: labels, datasets: datasets },
+      options: {
+        responsive: true,
+        plugins: { legend:{ position:'top', labels:{ boxWidth:10, font:{size:11} } } },
+        scales: {
+          x: { grid:{ color:'#f0f0ee' }, ticks:{ font:{size:11} } },
+          y: { grid:{ color:'#f0f0ee' }, ticks:{ font:{size:11} }, beginAtZero:true },
+        },
+      }
+    });
+    evoCharts.push(chart);
+  });
+}
+
+function renderAcumTable() {
+  var allMonthLabels = MONTHS.map(function(m){ return m.abbr; });
+  if (MEDIAS_COL) allMonthLabels.push('Méd');
+
+  var thead = '<tr><th>Indicador</th><th class="r">Meta</th>' +
+    allMonthLabels.map(function(a){ return '<th class="r">' + a + '</th><th class="r">%</th>'; }).join('') +
+  '</tr>';
+
+  var SECTION_ORDER = [
+    { label:'Operacional',   grupo:['operacional'] },
+    { label:'Captação',      grupo:['captacao'] },
+    { label:'Relacionamento',grupo:['relacionamento'] },
+    { label:'Liminares',     grupo:['lim_top','liminares_geral','liminares_saude','liminares_bancario'] },
+    { label:'Sentenças',     grupo:['sent_top','sentencas_geral','sentencas_saude','sentencas_bancario'] },
+    { label:'Recursos',      grupo:['rec_top','recursos_geral','recursos_saude','recursos_bancario'] },
+    { label:'Financeiro',    grupo:['financeiro'] },
+  ];
+
+  var tbody = '';
+  SECTION_ORDER.forEach(function(sec) {
+    var defs = KPI_DEFS.filter(function(d){ return sec.grupo.indexOf(d.grupo) >= 0; });
+    if (!defs.length) return;
+    tbody += '<tr><td class="sec" colspan="' + (2 + allMonthLabels.length * 2) + '">' + sec.label + '</td></tr>';
+    defs.forEach(function(def) {
+      var d = DATA[def.id];
+      if (!d) return;
+      tbody += '<tr><td class="kn">' + def.nome + '</td><td class="r">' + fmt(d.meta, def.fmt) + '</td>';
+      allMonthLabels.forEach(function(abbr) {
+        var isMedias = abbr === 'Méd';
+        var m = isMedias ? d.medias : (d.months[abbr] || {});
+        var v   = m.result;
+        var pct = m.pct;
+        var ci  = colorInfo(pct, def.dir);
+        tbody += '<td class="r">' + fmt(v, def.fmt) + '</td>';
+        tbody += '<td class="r"><span class="tpct ' + ci.cls + '">' +
+          '<span class="tdot ' + ci.dotCls + '"></span>' + fmtPct(pct) + '</span></td>';
+      });
+      tbody += '</tr>';
+    });
+  });
+
+  var tbl = document.getElementById('acum-table');
+  tbl.innerHTML = '<thead>' + thead + '</thead><tbody>' + tbody + '</tbody>';
+}
+
+// ════════════════════════════════════════════════════════
+//  MONTH BAR
+// ════════════════════════════════════════════════════════
+function buildMonthBar() {
+  var all = MONTHS.concat(MEDIAS_COL ? [MEDIAS_COL] : []);
+  if (!all.length) {
+    document.getElementById('mbar').innerHTML = '<span class="mbar-lbl">Sem meses disponíveis</span>';
+    return;
+  }
+  if (!mesSel || !all.find(function(m){ return m.abbr===mesSel; })) {
+    // Select last real month by default (not médias)
+    mesSel = MONTHS.length ? MONTHS[MONTHS.length-1].abbr : all[0].abbr;
+  }
+  document.getElementById('mbar').innerHTML =
+    '<span class="mbar-lbl">Mês:</span>' +
+    all.map(function(m) {
+      var isMedias = m.abbr === 'Méd';
+      return '<button class="m-btn' + (isMedias?' medias':'') + (mesSel===m.abbr?' active':'') +
+        '" onclick="selectMes(\'' + m.abbr + '\')">' + (isMedias ? '⌀ Médias' : m.abbr+'/26') + '</button>';
+    }).join('');
+}
+
+function selectMes(abbr) {
+  mesSel = abbr;
+  buildMonthBar();
+  renderMensal();
+}
+
+// ════════════════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════════════════
+function switchTab(name, btn) {
+  activeTab = name;
+  document.querySelectorAll('.tab-content').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'acumulado') renderAcumulado();
+}
+
+// ════════════════════════════════════════════════════════
+//  POLLING + CHANGE DETECTION
+// ════════════════════════════════════════════════════════
+function dataHash() {
+  if (!DATA) return '';
+  return JSON.stringify(Object.keys(DATA).sort().map(function(k){ return [k, DATA[k].months, DATA[k].medias]; }));
+}
+
+async function pollSheet() {
+  var table = await fetchData();
+  if (!table) return;
+  var parsed = parseTable(table);
+  if (!parsed) return;
+
+  var newHash = JSON.stringify(parsed.data);
+  if (newHash === lastHash) return; // no change
+  lastHash = newHash;
+
+  PARSED   = parsed;
+  MONTHS   = parsed.monthCols;
+  MEDIAS_COL = parsed.mediasCol;
+  DATA     = parsed.data;
+
+  buildMonthBar();
+  renderMensal();
+  if (activeTab === 'acumulado') renderAcumulado();
+
+  var now = new Date();
+  document.getElementById('hdr-sub').textContent =
+    'BM Advocacia & Consultoria · atualizado ' +
+    now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+function startPolling() {
+  if (pollingTimer) clearInterval(pollingTimer);
+  pollingTimer = setInterval(pollSheet, POLL_MS);
+}
+
+async function manualRefresh() {
+  lastHash = '';
+  await pollSheet();
+}
+
+// Re-poll when tab regains focus
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) pollSheet();
+});
+
+// ════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════
+(async function init() {
+  document.getElementById('g-operacional').innerHTML = '<div class="loading-msg">⟳ Carregando dados da planilha…</div>';
+  await pollSheet();
+  startPolling();
+})();
+</script>
+</body>
+</html>
